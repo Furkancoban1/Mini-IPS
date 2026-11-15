@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mini-IPS Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark text-white">
+    <div class="container mt-4">
+        <h2 class="text-center text-danger mb-4">Mini-IPS Live Dashboard</h2>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card bg-secondary text-white text-center p-3">
+                    <h5>Total Blocked Attacks</h5>
+                    <h2 id="totalBlocks" class="text-danger fw-bold">0</h2>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-secondary text-white p-3">
+                    <h5>Attack Distribution</h5>
+                    <div id="statsArea" class="mt-2">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-secondary text-white p-3 mb-4">
+            <h5 class="text-warning">⚙️ IPS Live Settings</h5>
+            <div class="row g-2 align-items-end mt-1">
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">SYN Limit (pkts)</label>
+                    <input type="number" id="syn_threshold" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">SYN Window (sec)</label>
+                    <input type="number" id="time_limit" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">Port Limit</label>
+                    <input type="number" id="port_threshold" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">Port Window (sec)</label>
+                    <input type="number" id="port_window" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">Behavior T.out (sec)</label>
+                    <input type="number" id="behavior_timeout" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">Ban Duration (sec)</label>
+                    <input type="number" id="ban_duration" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2">
+                    <label style="font-size: 12px;">Honeypot Port</label>
+                    <input type="number" id="honeypot" class="form-control form-control-sm bg-dark text-white border-secondary">
+                </div>
+                <div class="col-md-2 mt-3">
+                    <button class="btn btn-warning btn-sm w-100 fw-bold" onclick="saveConfig()">Update Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <h4>Last 50 Network Events</h4>
+        <table class="table table-dark table-striped mt-2">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Attacker IP</th>
+                    <th>Attack Type</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="logTable">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function loadConfig() {
+            fetch('/api/config')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('syn_threshold').value = data.syn_threshold;
+                    document.getElementById('time_limit').value = data.time_limit;
+                    document.getElementById('port_threshold').value = data.port_threshold;
+                    document.getElementById('port_window').value = data.port_window;
+                    document.getElementById('behavior_timeout').value = data.behavior_timeout;
+                    document.getElementById('ban_duration').value = data.ban_duration;
+                    document.getElementById('honeypot').value = data.honeypot;
+                });
+        }
+
+        function saveConfig() {
+            const payload = {
+                syn_threshold: parseInt(document.getElementById('syn_threshold').value),
+                time_limit: parseInt(document.getElementById('time_limit').value),
+                port_threshold: parseInt(document.getElementById('port_threshold').value),
+                port_window: parseInt(document.getElementById('port_window').value),
+                behavior_timeout: parseInt(document.getElementById('behavior_timeout').value),
+                ban_duration: parseInt(document.getElementById('ban_duration').value),
+                honeypot: parseInt(document.getElementById('honeypot').value)
+            };
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'success') {
+                    alert("Settings updated! The IPS engine will apply them automatically within 2 seconds.");
+                }
+            });
+        }
+
+        function fetchLogs() {
+            fetch('/api/logs')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('totalBlocks').innerText = data.total_blocks;
+                    let statsText = '';
+                    data.stats.forEach(stat => {
+                        statsText += stat.attack + " : " + stat.count + " times | ";
+                    });
+                    document.getElementById('statsArea').innerText = statsText;
+
+                    let tableRows = '';
+                    data.logs.forEach(log => {
+                        let timeString = new Date(log.timestamp * 1000).toLocaleTimeString();
+                        tableRows += `<tr><td>${timeString}</td><td>${log.ip}</td><td>${log.attack}</td><td>${log.action}</td></tr>`;
+                    });
+                    document.getElementById('logTable').innerHTML = tableRows;
+                });
+        }
+
+        loadConfig(); // Sayfa açılışında ayarları çek
+        setInterval(fetchLogs, 1500); // Logları güncelle
+    </script>
+</body>
+</html>
